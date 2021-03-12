@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: logstress
+objects:
+#
+# Deployment of N replicas of low-log-stress pods (10 logs per second)
+#
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: low-log-stress
+  spec:
+    replicas: 10
+    selector:
+      matchLabels:
+        app: low-log-stress
+    template:
+      metadata:
+        labels:
+          app: low-log-stress
+      spec:
+        containers:
+        - image: cognetive/logging-load-driver:0.1
+          imagePullPolicy: Always
+          name: low-log-stress
+          command: ["/loader"]
+          args:
+          - --msgpersec=100
+          - --distribution=fixed
+          - --payload-gen=fixed
+        restartPolicy: Always
+#
+# Deployment of M replicas of heavy-log-stress pods (1000 logs per second)
+#
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: heavy-log-stress
+  spec:
+    replicas: 4
+    selector:
+      matchLabels:
+        app: heavy-log-stress
+    template:
+      metadata:
+        labels:
+          app: heavy-log-stress
+      spec:
+        containers:
+        - image: cognetive/logging-load-driver:0.1
+          imagePullPolicy: Always
+          name: heavy-log-stress
+          command: ["/loader"]
+          args:
+          - --msgpersec=10000
+          - --distribution=fixed
+          - --payload-gen=fixed
+        restartPolicy: Always

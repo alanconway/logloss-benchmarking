@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: logcollector
+objects:
+#
+# Deployment of fluentd log collector
+#
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: fluentd
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: fluentd
+    template:
+      metadata:
+        labels:
+          app: fluentd
+      spec:
+        containers:
+        - image: quay.io/openshift/origin-logging-fluentd:latest
+          securityContext:
+            privileged: true
+            allowPrivilegeEscalation: true
+          imagePullPolicy: Always
+          name: fluentd
+          command: ["fluentd"]
+          #command: ["/bin/bash"]
+          #args:
+          #- -c
+          #- >
+          #  while true; do
+          #    echo ".";
+          #    sleep 60;
+          #  done;           
+          volumeMounts:
+          - name: varlog
+            mountPath: /var/log
+          - name: config-path
+            mountPath: /etc/fluent
+        restartPolicy: Always
+        volumes:
+        - name: varlog
+          hostPath:
+            path: /var/log
+        - name: config-path
+          configMap:
+            name: fluentd-config        

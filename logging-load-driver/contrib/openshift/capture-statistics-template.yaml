@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: capturestatistics
+objects:
+#
+# Deployment of fluentd log collector
+#
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: capturestatistics
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: capturestatistics
+    template:
+      metadata:
+        labels:
+          app: capturestatistics
+      spec:
+        containers:
+        - image: registry.fedoraproject.org/fedora
+          securityContext:
+            privileged: true
+            allowPrivilegeEscalation: true
+          imagePullPolicy: Always
+          name: capturestatistics
+          command: ["/bin/bash"]
+          args:
+          - -c
+          - >
+            yum install -y procps;
+            yum install -y unzip;
+            unzip /go/bin/check-logs-sequence.zip;
+            echo "Collecting Statistics";
+            FLUENT_FILE=$(ps -A -o %cpu,%mem,cmd | grep -E "^[ 0-9]+.[0-9]+ [ 0-9]+.[0-9]+ /usr/libexec/crio/conmon" | grep logstress_fluentd | grep 0.log | grep -o "[^ ]*fluentd/0.log");
+            FLUENT_FILE=/var/log/containers/fluentd.stresslog.log;
+            echo -e "\nFluentd log file is: $FLUENT_FILE\n";
+            touch $FLUENT_FILE;
+            ./check-logs-sequence -f $FLUENT_FILE -c 10000;
+            while true; do
+              echo "====> Statistics on: $(date)";
+              echo " cpu mem "
+              ps -A -o %cpu,%mem,cmd | grep -E "^[ 0-9]+.[0-9]+ [ 0-9]+.[0-9]+ /usr/libexec/crio/conmon" | grep logstress_fluentd | grep 0.log | awk '{print $1,$2,"fluentd"}'
+              ps -A -o %cpu,%mem,cmd | grep -E "^[ 0-9]+.[0-9]+ [ 0-9]+.[0-9]+ /usr/libexec/crio/conmon" | grep logstress_heavy-log-stress | grep 0.log | awk '{print $1,$2,"heavy-stress"}' 
+              ps -A -o %cpu,%mem,cmd | grep -E "^[ 0-9]+.[0-9]+ [ 0-9]+.[0-9]+ /usr/libexec/crio/conmon" | grep logstress_low-log-stress | grep 0.log | awk '{print $1,$2,"low-stress"}' 
+              echo "====> ";
+              echo "";
+              sleep 60;
+            done;        
+          volumeMounts:
+          - name: varlog
+            mountPath: /var/log
+          - name: checklogssequence
+            mountPath: /go/bin
+        volumes:
+        - name: varlog
+          hostPath:
+            path: /var/log
+        - name: checklogssequence
+          configMap:
+            name: check-logs-sequence-binary-zip
+        hostPID: true
+          
